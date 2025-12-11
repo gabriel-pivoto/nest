@@ -28,21 +28,44 @@ export class CreateQuestionController {
     const { title, content } = body
     const userId = user.sub
 
+    const slug = await this.createUniqueSlug(title)
+
     await this.prisma.question.create({
       data: {
         title,
         content,
-        slug: this.convertToSlug(title),
+        slug,
         authorId: userId,
       },
     })
   }
+
+  private async createUniqueSlug(title: string): Promise<string> {
+    const baseSlug = this.convertToSlug(title)
+    const existing = await this.prisma.question.count({
+      where: {
+        slug: {
+          startsWith: baseSlug,
+        },
+      },
+    })
+
+    if (existing === 0) return baseSlug
+
+    return `${baseSlug}-${existing}`
+  }
+
   private convertToSlug(title: string): string {
-    return title
+    const normalized = title
+      .trim()
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s-]/g, '') 
+      .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+
+    return normalized || 'question'
   }
 }
